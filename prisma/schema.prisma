@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String @id @default(cuid())
+  username     String @unique
+  email        String @unique
+  passwordHash String
+  role         String @default("USER")
+  hidden       Boolean @default(false)
+  createdAt    DateTime @default(now())
+  profile      Profile?
+  settings     AccountSetting?
+  premium      PremiumSubscription?
+  verification VerificationStatus?
+  sessions     Session[]
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
+  following    Follow[] @relation("following")
+  followers    Follow[] @relation("followers")
+  memberships  ConversationParticipant[]
+  messages     Message[]
+  albums       PhotoAlbum[]
+  photos       Photo[]
+  notifications Notification[]
+  blocks       BlockedUser[] @relation("blocker")
+  blockedBy    BlockedUser[] @relation("blocked")
+}
+
+model Profile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  bio         String @default("")
+  avatar      String @default("/assets/avatar-1.svg")
+  cover       String @default("/assets/cover.svg")
+  interests   String @default("Photography, Coffee")
+  location    String @default("Somewhere, Earth")
+  website     String @default("")
+  profileBadge String @default("")
+}
+
+model Session {
+  id        String @id @default(cuid())
+  token     String @unique
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean @default(false)
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id        String @id @default(cuid())
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  image     String?
+  isPrivate Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  comments  Comment[]
+  likes     Like[]
+}
+
+model Comment {
+  id        String @id @default(cuid())
+  postId    String
+  post      Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id     String @id @default(cuid())
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId String
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@unique([userId, postId])
+}
+
+model Follow {
+  id          String @id @default(cuid())
+  followerId  String
+  follower    User @relation("following", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User @relation("followers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  @@unique([followerId, followingId])
+}
+
+model Conversation {
+  id           String @id @default(cuid())
+  title        String @default("")
+  createdAt    DateTime @default(now())
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime @default(now())
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  createdAt      DateTime @default(now())
+}
+
+model PhotoAlbum {
+  id        String @id @default(cuid())
+  ownerId   String
+  owner     User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  isPrivate Boolean @default(false)
+  createdAt DateTime @default(now())
+  photos    Photo[]
+}
+
+model Photo {
+  id        String @id @default(cuid())
+  ownerId   String
+  owner     User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  albumId   String?
+  album     PhotoAlbum? @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  url       String
+  mimeType  String @default("image/svg+xml")
+  filename  String @default("photo.svg")
+  caption   String @default("")
+  isPrivate Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String @id @default(cuid())
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  content   String
+  href      String @default("/")
+  read      Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AccountSetting {
+  id                 String @id @default(cuid())
+  userId             String @unique
+  user               User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  privateAccount     Boolean @default(false)
+  allowMessages      Boolean @default(true)
+  emailNotifications Boolean @default(true)
+  showActivity       Boolean @default(true)
+  resetToken         String?
+  resetExpires       DateTime?
+}
+
+model BlockedUser {
+  id        String @id @default(cuid())
+  blockerId String
+  blocker   User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  @@unique([blockerId, blockedId])
+}
+
+model PremiumSubscription {
+  id           String @id @default(cuid())
+  userId       String @unique
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       String @default("FREE")
+  credits      Int @default(100)
+  trialUsed    Boolean @default(false)
+  pendingPlan  String?
+  startedAt    DateTime?
+}
+
+model VerificationStatus {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isVerified  Boolean @default(false)
+  requestedAt DateTime?
+  state       String @default("NONE")
+}
