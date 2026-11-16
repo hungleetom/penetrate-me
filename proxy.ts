@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 export function proxy(req: NextRequest) {
-  const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
-  if (!["localhost", "127.0.0.1"].includes(host))
+  const authority = (req.headers.get("host") || "").toLowerCase();
+  const host = authority.split(":")[0];
+  // Explicit opt-in for the bridge-only socat forwarder used by Shannon.
+  const dockerBridge =
+    process.env.SHANNON_DOCKER_ACCESS === "1" &&
+    authority === "172.17.0.1:3001";
+  if (!["localhost", "127.0.0.1"].includes(host) && !dockerBridge)
     return new NextResponse("Local development host only", { status: 403 });
   const res = NextResponse.next();
   res.headers.set("Cache-Control", "no-store");
